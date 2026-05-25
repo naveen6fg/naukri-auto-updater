@@ -1,6 +1,6 @@
 """
-Naukri Profile Auto-Updater — GitHub Actions Edition
-- Uses Chromium + chromedriver installed via apt (perfectly version-matched)
+Naukri Profile Auto-Updater — GitHub Actions Edition (Cookie-based login)
+- Skips login form entirely — uses session cookies directly
 - Updates First Name field to refresh "Last Updated" timestamp
 - Toggles trailing space each run
 """
@@ -27,9 +27,11 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-NAUKRI_EMAIL    = os.environ.get("NAUKRI_EMAIL", "")
-NAUKRI_PASSWORD = os.environ.get("NAUKRI_PASSWORD", "")
-STATE_FILE      = os.path.join(os.path.dirname(os.path.abspath(__file__)), "toggle_state.txt")
+# ── Session cookies from GitHub Secrets ───────────────────────────────────────
+NAUK_SHOW_MSG   = os.environ.get("NAUK_SHOW_MSG", "")    # showMsgDashboard value
+NAUK_UNIQUE     = os.environ.get("NAUK_UNIQUE", "")      # uniqueFlag value
+
+STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "toggle_state.txt")
 
 
 def human_delay(min_s=1.0, max_s=2.5):
@@ -104,61 +106,68 @@ def build_driver() -> webdriver.Chrome:
     return driver
 
 
-def login(driver):
-    log.info("Navigating to Naukri login …")
-    driver.get("https://www.naukri.com/nlogin/login")
-    human_delay(3, 5)
+def inject_cookies(driver):
+    """
+    Inject session cookies directly — bypasses login form and OTP entirely.
+    Must navigate to naukri.com first before setting cookies (same-domain rule).
+    """
+    log.info("Injecting session cookies …")
 
-    log.info(f"URL after load: {driver.current_url}")
-    log.info(f"Page title: {driver.title}")
+    # Must be on naukri.com domain before setting cookies
+    driver.get("https://www.naukri.com")
+    human_delay(2, 3)
 
-    email_el = WebDriverWait(driver, 20).until(
-        EC.presence_of_element_located((By.ID, "usernameField"))
-    )
-    log.info("Email field found ✓")
-    email_el.clear()
-    human_delay(0.5, 1)
-    email_el.send_keys(NAUKRI_EMAIL)
-    log.info(f"Email entered: {NAUKRI_EMAIL[:4]}****")
-    human_delay()
+    cookies = [
+        {
+            "name":   "showMsgDashboard",
+            "value":  NAUK_SHOW_MSG,
+            "domain": ".naukri.com",
+            "path":   "/",
+            "secure": True,
+        },
+        {
+            "name":   "uniqueFlag",
+            "value":  NAUK_UNIQUE,
+            "domain": ".naukri.com",
+            "path":   "/",
+            "secure": True,
+        },
+    ]
 
-    pwd_el = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.ID, "passwordField"))
-    )
-    log.info("Password field found ✓")
-    pwd_el.clear()
-    human_delay(0.5, 1)
-    pwd_el.send_keys(NAUKRI_PASSWORD)
-    log.info("Password entered ✓")
-    human_delay()
+    for cookie in cookies:
+        driver.add_cookie(cookie)
+        log.info(f"Cookie set: {cookie['name']} ✓")
 
+    # Refresh so cookies take effect
+    driver.refresh()
+    human_delay(3, 4)
+
+    log.info(f"URL after cookie inject: {driver.current_url}")
+    driver.save_screenshot("after_cookie.png")
+
+    # Verify we are logged in by checking for profile-related element
     try:
-        login_btn = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((
                 By.XPATH,
-                "//button[contains(text(),'Login') or contains(text(),'login') or @type='submit']"
+                "//a[contains(@href,'mnjuser/profile')] | //div[contains(@class,'nI-gNb-drawer')]"
             ))
         )
-        driver.execute_script("arguments[0].click();", login_btn)
-        log.info("Login button clicked ✓")
-    except Exception:
-        pwd_el.send_keys(Keys.RETURN)
-        log.info("Pressed Enter to submit ✓")
+        log.info("Session valid — logged in via cookies ✓")
+    except TimeoutException:
+        driver.save_screenshot("login_failed.png")
+        raise RuntimeError(
+            "Cookie login failed — session may have expired. "
+            "Re-export cookies from your browser and update GitHub Secrets."
+        )
 
-    human_delay(5, 7)
-
-    driver.save_screenshot("login_failed.png")
-    log.info(f"URL after login: {driver.current_url}")
-
-    if "nlogin" in driver.current_url:
-        raise RuntimeError("Login failed — check NAUKRI_EMAIL / NAUKRI_PASSWORD secrets.")
-
-    log.info("Login successful ✓")
 
 def update_name_field(driver):
     log.info("Opening profile page …")
     driver.get("https://www.naukri.com/mnjuser/profile")
     human_delay(4, 6)
+
+    log.info(f"Profile page URL: {driver.current_url}")
 
     try:
         edit_btn = WebDriverWait(driver, 15).until(
@@ -217,8 +226,8 @@ def update_name_field(driver):
 
 
 def run():
-    if not NAUKRI_EMAIL or not NAUKRI_PASSWORD:
-        log.error("NAUKRI_EMAIL or NAUKRI_PASSWORD not set. Aborting.")
+    if not NAUK_UNIQUE:
+        log.error("NAUK_UNIQUE secret not set. Aborting.")
         raise SystemExit(1)
 
     log.info("=" * 60)
@@ -228,7 +237,7 @@ def run():
     driver = None
     try:
         driver = build_driver()
-        login(driver)
+        inject_cookies(driver)
         update_name_field(driver)
         log.info("Run completed successfully ✓")
     except Exception as e:
