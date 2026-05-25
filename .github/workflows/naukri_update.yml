@@ -42,18 +42,14 @@ jobs:
           NAUK_NKWAP:   ${{ secrets.NAUK_NKWAP }}
           NAUK_UNID:    ${{ secrets.NAUK_UNID }}
           NAUK_J:       ${{ secrets.NAUK_J }}
-          NAUKRI_EMAIL:    ${{ secrets.NAUKRI_EMAIL }}
-          NAUKRI_PASSWORD: ${{ secrets.NAUKRI_PASSWORD }}
-          NAUK_SHOW_MSG:   ${{ secrets.NAUK_SHOW_MSG }}
-          NAUK_UNIQUE:     ${{ secrets.NAUK_UNIQUE }}
         run: python naukri_updater.py
 
-      - name: Upload failure screenshot
+      - name: Upload failure screenshots
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: login-failure-screenshot
-          path: login_failed.png
+          name: debug-screenshots
+          path: "*.png"
           retention-days: 3
 
       - name: Commit toggle state
