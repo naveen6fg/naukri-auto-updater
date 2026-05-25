@@ -42,6 +42,10 @@ jobs:
           NAUK_NKWAP:   ${{ secrets.NAUK_NKWAP }}
           NAUK_UNID:    ${{ secrets.NAUK_UNID }}
           NAUK_J:       ${{ secrets.NAUK_J }}
+          NAUKRI_EMAIL:    ${{ secrets.NAUKRI_EMAIL }}
+          NAUKRI_PASSWORD: ${{ secrets.NAUKRI_PASSWORD }}
+          NAUK_SHOW_MSG:   ${{ secrets.NAUK_SHOW_MSG }}
+          NAUK_UNIQUE:     ${{ secrets.NAUK_UNIQUE }}
         run: python naukri_updater.py
 
       - name: Upload failure screenshot
