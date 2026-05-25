@@ -1,63 +1,45 @@
-# .github/workflows/naukri_update.yml
-#
-# Runs Naukri profile updater twice daily:
-#   10:00 AM IST = 04:30 UTC
-#    9:00 PM IST = 15:30 UTC
-#
-# Credentials stored as GitHub Secrets:
-#   NAUKRI_EMAIL
-#   NAUKRI_PASSWORD
-
 name: Naukri Profile Auto-Updater
 
 on:
   schedule:
-    - cron: "30 4 * * *"    # 10:00 AM IST  (IST = UTC + 5:30)
+    - cron: "30 4 * * *"    # 10:00 AM IST
     - cron: "30 15 * * *"   #  9:00 PM IST
-  workflow_dispatch:         # allows manual trigger from GitHub Actions UI
+  workflow_dispatch:
 
 jobs:
   update-profile:
     name: Update Naukri Profile
     runs-on: ubuntu-latest
     permissions:
-      contents: write        # needed to commit toggle_state.txt back
+      contents: write
 
     steps:
-      # 1. Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # 2. Set up Python
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # 3. Install Chrome (stable)
-      - name: Install Google Chrome
+      - name: Install Chrome + matching ChromeDriver
         run: |
-          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" \
-            | sudo tee /etc/apt/sources.list.d/google-chrome.list
           sudo apt-get update -q
-          sudo apt-get install -y google-chrome-stable
-          google-chrome --version
+          sudo apt-get install -y chromium-browser chromium-chromedriver
+          chromium-browser --version
+          chromedriver --version
 
-      # 4. Install Python dependencies
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: pip install selenium==4.21.0
 
-      # 5. Run the updater script
       - name: Run Naukri updater
         env:
           NAUKRI_EMAIL:    ${{ secrets.NAUKRI_EMAIL }}
           NAUKRI_PASSWORD: ${{ secrets.NAUKRI_PASSWORD }}
         run: python naukri_updater.py
 
-      # 6. Upload screenshot if login failed (only on failure)
       - name: Upload failure screenshot
         if: failure()
         uses: actions/upload-artifact@v4
@@ -66,7 +48,6 @@ jobs:
           path: login_failed.png
           retention-days: 3
 
-      # 7. Commit updated toggle_state.txt back to repo
       - name: Commit toggle state
         run: |
           git config user.name  "github-actions[bot]"
