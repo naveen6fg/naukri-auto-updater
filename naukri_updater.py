@@ -49,7 +49,6 @@ def write_toggle_state(state: bool):
 
 
 def find_chromedriver() -> str:
-    """Find chromedriver binary — works for both chromium-chromedriver and google-chrome installs."""
     candidates = [
         "/usr/lib/chromium-browser/chromedriver",
         "/usr/bin/chromedriver",
@@ -59,17 +58,15 @@ def find_chromedriver() -> str:
         if os.path.exists(path):
             log.info(f"Using chromedriver at: {path}")
             return path
-    # Last resort: which
     result = subprocess.run(["which", "chromedriver"], capture_output=True, text=True)
     if result.returncode == 0:
         path = result.stdout.strip()
         log.info(f"Using chromedriver at: {path}")
         return path
-    raise FileNotFoundError("chromedriver not found. Check workflow install step.")
+    raise FileNotFoundError("chromedriver not found.")
 
 
 def find_chrome_binary() -> str:
-    """Find chrome/chromium binary."""
     candidates = [
         "/usr/bin/chromium-browser",
         "/usr/bin/chromium",
