@@ -24,11 +24,11 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Chrome + matching ChromeDriver
+      - name: Install Chromium + ChromeDriver
         run: |
           sudo apt-get update -q
           sudo apt-get install -y chromium-browser chromium-chromedriver
-          chromium-browser --version
+          chromium-browser --version || chromium --version
           chromedriver --version
 
       - name: Install Python dependencies
