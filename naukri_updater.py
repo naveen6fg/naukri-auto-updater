@@ -109,23 +109,46 @@ def login(driver):
     driver.get("https://www.naukri.com/nlogin/login")
     human_delay(3, 5)
 
+    log.info(f"URL after load: {driver.current_url}")
+    log.info(f"Page title: {driver.title}")
+
     email_el = WebDriverWait(driver, 20).until(
         EC.presence_of_element_located((By.ID, "usernameField"))
     )
+    log.info("Email field found ✓")
     email_el.clear()
+    human_delay(0.5, 1)
     email_el.send_keys(NAUKRI_EMAIL)
+    log.info(f"Email entered: {NAUKRI_EMAIL[:4]}****")
     human_delay()
 
-    pwd_el = driver.find_element(By.ID, "passwordField")
+    pwd_el = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.ID, "passwordField"))
+    )
+    log.info("Password field found ✓")
     pwd_el.clear()
+    human_delay(0.5, 1)
     pwd_el.send_keys(NAUKRI_PASSWORD)
+    log.info("Password entered ✓")
     human_delay()
 
-    pwd_el.send_keys(Keys.RETURN)
+    try:
+        login_btn = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((
+                By.XPATH,
+                "//button[contains(text(),'Login') or contains(text(),'login') or @type='submit']"
+            ))
+        )
+        driver.execute_script("arguments[0].click();", login_btn)
+        log.info("Login button clicked ✓")
+    except Exception:
+        pwd_el.send_keys(Keys.RETURN)
+        log.info("Pressed Enter to submit ✓")
+
     human_delay(5, 7)
 
-    # Always save screenshot so we can see what happened
     driver.save_screenshot("login_failed.png")
+    log.info(f"URL after login: {driver.current_url}")
 
     if "nlogin" in driver.current_url:
         raise RuntimeError("Login failed — check NAUKRI_EMAIL / NAUKRI_PASSWORD secrets.")
