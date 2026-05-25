@@ -124,12 +124,13 @@ def login(driver):
     pwd_el.send_keys(Keys.RETURN)
     human_delay(5, 7)
 
+    # Always save screenshot so we can see what happened
+    driver.save_screenshot("login_failed.png")
+
     if "nlogin" in driver.current_url:
-        driver.save_screenshot("login_failed.png")
         raise RuntimeError("Login failed — check NAUKRI_EMAIL / NAUKRI_PASSWORD secrets.")
 
     log.info("Login successful ✓")
-
 
 def update_name_field(driver):
     log.info("Opening profile page …")
