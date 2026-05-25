@@ -164,36 +164,78 @@ def inject_cookies(driver):
 def update_name_field(driver):
     log.info("Opening profile page …")
     driver.get("https://www.naukri.com/mnjuser/profile")
-    human_delay(4, 6)
+    human_delay(5, 7)
 
     log.info(f"Profile page URL: {driver.current_url}")
+    driver.save_screenshot("profile_loaded.png")
 
-    try:
-        edit_btn = WebDriverWait(driver, 15).until(
-            EC.element_to_be_clickable((
-                By.XPATH,
-                "//div[contains(@class,'personalDetails') or contains(@class,'personal-details')]"
-                "//span[contains(@class,'edit') or @title='Edit']"
-            ))
-        )
-    except TimeoutException:
-        edit_btn = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((
-                By.XPATH,
-                "//section[contains(@id,'personal')]//span[contains(@class,'edit')]"
-            ))
+    # ── Step 1: Find & click the Edit button for Personal Details ─────────────
+    # Try multiple XPath patterns — Naukri's class names change over time
+    edit_xpaths = [
+        # Current Naukri UI (2024-2025)
+        "//div[contains(@class,'widgetHead') and .//*[contains(text(),'Personal')]]//span[contains(@class,'edit')]",
+        "//div[contains(@class,'widgetHead') and .//*[contains(text(),'Personal')]]//button",
+        # Generic edit icons near "Personal Details" heading
+        "//*[contains(text(),'Personal Details')]/ancestor::div[1]//*[contains(@class,'edit')]",
+        "//*[contains(text(),'Personal Details')]/following::span[contains(@class,'edit')][1]",
+        "//*[contains(text(),'Personal Details')]/following::button[contains(@class,'edit')][1]",
+        # Broadest fallback — any edit pencil icon on page
+        "//span[contains(@class,'editIcon')]",
+        "//span[@title='Edit']",
+        "//i[contains(@class,'edit')]",
+    ]
+
+    edit_btn = None
+    for xpath in edit_xpaths:
+        try:
+            edit_btn = WebDriverWait(driver, 5).until(
+                EC.element_to_be_clickable((By.XPATH, xpath))
+            )
+            log.info(f"Edit button found with: {xpath}")
+            break
+        except TimeoutException:
+            continue
+
+    if edit_btn is None:
+        driver.save_screenshot("edit_btn_not_found.png")
+        raise RuntimeError(
+            "Could not find Personal Details edit button. "
+            "Check edit_btn_not_found.png artifact for current page layout."
         )
 
+    driver.execute_script("arguments[0].scrollIntoView({block:'center'});", edit_btn)
+    human_delay(0.5, 1)
     driver.execute_script("arguments[0].click();", edit_btn)
-    log.info("Opened Personal Details edit panel.")
+    log.info("Clicked Personal Details edit button.")
     human_delay(2, 3)
+    driver.save_screenshot("after_edit_click.png")
 
-    first_name_el = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((
-            By.XPATH,
-            "//input[@name='firstName'] | //input[@placeholder='First Name'] | //input[@id='firstName']"
-        ))
-    )
+    # ── Step 2: Find the First Name input ─────────────────────────────────────
+    name_xpaths = [
+        "//input[@name='firstName']",
+        "//input[@id='firstName']",
+        "//input[@placeholder='First Name']",
+        "//input[@placeholder='Enter first name']",
+        "//label[contains(text(),'First')]/following::input[1]",
+    ]
+
+    first_name_el = None
+    for xpath in name_xpaths:
+        try:
+            first_name_el = WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.XPATH, xpath))
+            )
+            log.info(f"First name input found with: {xpath}")
+            break
+        except TimeoutException:
+            continue
+
+    if first_name_el is None:
+        driver.save_screenshot("firstname_not_found.png")
+        raise RuntimeError(
+            "Could not find First Name input. "
+            "Check firstname_not_found.png artifact for current page layout."
+        )
 
     current_name = first_name_el.get_attribute("value") or ""
     log.info(f"Current first name: '{current_name}'")
@@ -202,22 +244,46 @@ def update_name_field(driver):
     new_name  = (current_name.rstrip() + " ") if add_space else current_name.rstrip()
     log.info(f"{'Adding' if add_space else 'Removing'} trailing space → '{new_name}'")
 
+    # Clear and type new value
+    driver.execute_script("arguments[0].scrollIntoView({block:'center'});", first_name_el)
     first_name_el.click()
-    human_delay(0.5, 1)
+    human_delay(0.3, 0.6)
     first_name_el.send_keys(Keys.CONTROL + "a")
     first_name_el.send_keys(Keys.DELETE)
-    human_delay(0.3, 0.7)
+    human_delay(0.3, 0.5)
     first_name_el.send_keys(new_name)
     human_delay(1, 2)
 
-    save_btn = WebDriverWait(driver, 10).until(
-        EC.element_to_be_clickable((
-            By.XPATH,
-            "//button[normalize-space()='Save' or normalize-space()='save' or normalize-space()='SAVE']"
-        ))
-    )
+    # ── Step 3: Save ──────────────────────────────────────────────────────────
+    save_xpaths = [
+        "//button[normalize-space()='Save']",
+        "//button[normalize-space()='SAVE']",
+        "//button[normalize-space()='save']",
+        "//button[contains(@class,'save') and not(@disabled)]",
+        "//input[@type='submit' and (contains(@value,'Save') or contains(@value,'SAVE'))]",
+    ]
+
+    save_btn = None
+    for xpath in save_xpaths:
+        try:
+            save_btn = WebDriverWait(driver, 5).until(
+                EC.element_to_be_clickable((By.XPATH, xpath))
+            )
+            log.info(f"Save button found with: {xpath}")
+            break
+        except TimeoutException:
+            continue
+
+    if save_btn is None:
+        driver.save_screenshot("save_btn_not_found.png")
+        raise RuntimeError(
+            "Could not find Save button. "
+            "Check save_btn_not_found.png artifact for current page layout."
+        )
+
     driver.execute_script("arguments[0].click();", save_btn)
     human_delay(3, 4)
+    driver.save_screenshot("after_save.png")
 
     write_toggle_state(not add_space)
     log.info("Profile timestamp refreshed ✓")
